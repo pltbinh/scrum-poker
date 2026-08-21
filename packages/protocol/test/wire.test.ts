@@ -1,7 +1,21 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { decodeSnapshot, encodeSnapshot, type RoomSnapshot } from "../src/index.js";
 
 describe("compact room snapshots", () => {
+  it("stays byte-compatible with the shared backend wire-v1 fixture", async () => {
+    const fixture = JSON.parse(
+      await readFile(new URL("./fixtures/scrum-poker-wire-v1.json", import.meta.url), "utf8"),
+    );
+
+    expect(encodeSnapshot(decodeSnapshot(fixture.voting))).toEqual(fixture.voting);
+    expect(encodeSnapshot(decodeSnapshot(fixture.revealed))).toEqual(fixture.revealed);
+
+    const leakedVotingSnapshot = structuredClone(fixture.voting);
+    leakedVotingSnapshot.u[0].push("5");
+    expect(() => decodeSnapshot(leakedVotingSnapshot)).toThrow(/hidden vote/i);
+  });
+
   it("round-trips a revealed room", () => {
     const snapshot: RoomSnapshot = {
       roomId: "room-1",
