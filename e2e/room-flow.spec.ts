@@ -1,5 +1,3 @@
-const { mkdtemp, rm } = require("node:fs/promises");
-const { tmpdir } = require("node:os");
 const { join } = require("node:path");
 const { spawn } = require("node:child_process");
 const { test, expect } = require("@playwright/test");
@@ -7,34 +5,28 @@ const { test, expect } = require("@playwright/test");
 const ROOT_DIR = process.cwd();
 const HOST = "127.0.0.1";
 const STARTUP_TIMEOUT_MS = 60_000;
-const NODE_COMMAND = process.execPath;
-const PNPM_COMMAND = "corepack";
 const VITE_COMMAND = join(ROOT_DIR, "node_modules", ".bin", process.platform === "win32" ? "vite.cmd" : "vite");
 
-async function allocatePort() {
-  const net = require("node:net");
+function readApiUrl() {
+  const value = process.env.VITE_API_BASE_URL?.trim();
+  if (!value) {
+    throw new Error("VITE_API_BASE_URL is required for E2E tests against the externally managed backend.");
+  }
 
-  return new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.once("error", reject);
-    server.listen(0, HOST, () => {
-      const address = server.address();
+  const url = new URL(value);
+  if (!new Set(["http:", "https:"]).has(url.protocol) || url.username || url.password || url.search || url.hash) {
+    throw new Error("VITE_API_BASE_URL must be an HTTP(S) API origin without credentials, query, or fragment.");
+  }
 
-      if (address === null || typeof address === "string") {
-        server.close(() => reject(new Error("Expected an IPv4 test port.")));
-        return;
-      }
+  return url.toString().replace(/\/$/, "");
+}
 
-      server.close((error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-
-        resolve(address.port);
-      });
-    });
-  });
+function readWebPort() {
+  const port = Number(process.env.E2E_WEB_PORT ?? "4173");
+  if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) {
+    throw new Error("E2E_WEB_PORT must be a valid TCP port.");
+  }
+  return port;
 }
 
 async function runCommand(command, args, env) {
@@ -101,13 +93,10 @@ async function stopProcess(processToStop) {
 }
 
 async function createEnvironment() {
-  const apiPort = await allocatePort();
-  const webPort = await allocatePort();
-  const tempDir = await mkdtemp(join(tmpdir(), "scrum-poker-room-flow-"));
-  const apiUrl = `http://${HOST}:${apiPort}`;
+  const apiUrl = readApiUrl();
+  const webPort = readWebPort();
   const webUrl = `http://${HOST}:${webPort}`;
 
-  await runCommand(PNPM_COMMAND, ["pnpm", "--filter", "@scrum-poker/server", "build"], {});
   await runCommand(
     VITE_COMMAND,
     ["build", "--config", "apps/web/vite.config.ts"],
@@ -116,19 +105,6 @@ async function createEnvironment() {
       VITE_BASE_PATH: "/",
     },
   );
-
-  const serverProcess = spawn(NODE_COMMAND, ["apps/server/dist/index.js"], {
-    cwd: ROOT_DIR,
-    env: {
-      ...process.env,
-      NODE_ENV: "test",
-      HOST,
-      PORT: String(apiPort),
-      CORS_ORIGINS: webUrl,
-      EGRESS_DISABLED_FILE: join(tempDir, "egress-disabled.flag"),
-    },
-    stdio: "pipe",
-  });
 
   const previewProcess = spawn(
     VITE_COMMAND,
@@ -143,21 +119,13 @@ async function createEnvironment() {
     },
   );
 
-  await waitForHttp(`${apiUrl}/health/ready`);
   await waitForHttp(webUrl);
 
   return {
-    apiUrl,
     previewProcess,
-    serverProcess,
-    tempDir,
     webUrl,
     dispose: async () => {
-      await Promise.allSettled([
-        stopProcess(previewProcess),
-        stopProcess(serverProcess),
-      ]);
-      await rm(tempDir, { recursive: true, force: true });
+      await stopProcess(previewProcess);
     },
   };
 }

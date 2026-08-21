@@ -1,38 +1,46 @@
-# SSE Load Gate
+# SSE load client
 
-`pnpm test:load -- --base-url=http://127.0.0.1:4100` runs the Task 9 HTTP/SSE load runner against an explicit loopback backend. The runner never defaults to a URL, rejects malformed values, and refuses production-looking hosts such as `https://poker-api.keothom24.com`.
+`pnpm test:load -- --base-url=http://127.0.0.1:4100` runs the HTTP/SSE
+client against an explicit, locally routed Scrum Poker API. The client never
+starts a backend, never defaults to a URL, rejects malformed values, and
+refuses production-looking hosts such as
+`https://poker-api.keothom24.com`.
 
-The load shape is fixed at `5` rooms x `20` participants (`100` concurrent SSE clients). The runner:
+The backend and its test harness are owned by `keothom/be`. Start an approved
+local `all-in-one-backend` harness separately and route the supplied URL to
+the `scrum-poker` service before running this client. Direct shared-host
+requests require the trusted `X-Backend-App: scrum-poker` metadata, so use
+the KeoThom-owned local proxy or test harness rather than pointing this client
+at an unrouted shared-host port.
 
-- creates the same rooms and participants the browser API would create;
+The load shape is fixed at 5 rooms by 20 participants: 100 concurrent SSE
+clients. The runner:
+
+- creates the same rooms and participants as the browser;
 - requests one short-lived stream ticket per participant;
-- opens `100` `text/event-stream` connections over ordinary HTTP;
+- opens 100 native `text/event-stream` connections;
 - waits for all initial snapshots;
 - casts representative votes, reveals, and resets every room;
-- keeps the streams open for the configured duration;
-- fails on partial setup or an unexpected disconnect; and
-- logs aggregate counts only, never participant tokens, facilitator tokens, stream tickets, authorization headers, or authenticated URLs.
+- keeps streams open for the configured duration;
+- fails on partial setup or excess unexpected disconnects; and
+- logs aggregate counts only, never credentials or authenticated URLs.
 
-`--allowed-unexpected-disconnects` is an inclusive non-negative allowance used by the final evaluator. It defaults to `0`, so any unexpected disconnect fails the gate; with an allowance of `N`, counts through `N` pass and counts above `N` fail.
+`--allowed-unexpected-disconnects` is an inclusive non-negative allowance
+and defaults to `0`.
 
 ## Local 30-second check
 
-Use the server test-start command and the repository-local binary wrapper on this Windows checkout:
+After the backend owner provides a routed loopback API URL:
 
 ```text
-node scripts/run-local-bin.mjs start-server-and-test "corepack pnpm --filter @scrum-poker/server start:test" http://127.0.0.1:4100/health/ready "corepack pnpm test:load -- --base-url=http://127.0.0.1:4100 --duration-seconds=30"
+corepack pnpm test:load -- --base-url=http://127.0.0.1:4100 --duration-seconds=30
 ```
 
-`apps/server start:test` binds only to `127.0.0.1:4100`, uses explicit local environment variables, and does not point at any production URL.
+## Five-minute observation gate
 
-## Production observation gate
-
-Running any load against production requires explicit human approval and is not part of local verification. The CLI runner intentionally rejects production-looking URLs, so the production gate is a manual observation checklist for the shared VM:
-
-1. Start the approved production load from a separately authorized environment.
-2. Observe `scrum-poker-backend` with either `pm2 monit` or `pm2 jlist`.
-3. Reject the deployment if peak RSS for `scrum-poker-backend` exceeds `220 MiB`.
-4. Reject the deployment if any existing PM2 process restart counter increases during the run.
-5. Reject the deployment if available VM memory drops below `100 MiB` at any point during the run.
-
-The intended production observation window is `300` seconds. Record the exact commands, timestamps, peak RSS, restart counters, and free-memory readings in the deployment evidence before approving release.
+Running load against production requires explicit approval and is not part of
+repository verification. Coordinate the 300-second observation with the
+KeoThom backend owner and follow
+`keothom/docs/all-in-one-backend-operations.md` for process RSS, restart
+counters, available memory, and rollback criteria. This repository does not
+own PM2, Nginx, VM state, or backend lifecycle operations.

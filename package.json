@@ -6,21 +6,19 @@
     "node": ">=20 <21"
   },
   "scripts": {
-    "build": "corepack pnpm -r build",
-    "test": "node scripts/run-local-bin.mjs vitest run --config vitest.config.mjs && corepack pnpm --filter @scrum-poker/protocol test && corepack pnpm --filter @scrum-poker/server test && corepack pnpm --filter @scrum-poker/web test",
-    "typecheck": "corepack pnpm -r typecheck",
+    "build": "corepack pnpm --filter @scrum-poker/protocol build && corepack pnpm --filter @scrum-poker/web build",
+    "test": "corepack pnpm --filter @scrum-poker/protocol test && corepack pnpm --filter @scrum-poker/web test && node scripts/run-local-bin.mjs vitest run --config vitest.config.mjs",
+    "typecheck": "corepack pnpm --filter @scrum-poker/protocol typecheck && corepack pnpm --filter @scrum-poker/web typecheck",
     "lint:no-sockets": "node scripts/no-sockets.mjs",
     "test:e2e": "node scripts/run-local-bin.mjs playwright test",
-    "test:load": "corepack pnpm --filter @scrum-poker/protocol build && node scripts/run-local-bin.mjs tsc -p load/tsconfig.json && node scripts/run-local-bin.mjs cross-env NODE_PATH=apps/server/node_modules node .task-9-load-build/load/sse-load.js"
+    "test:load": "corepack pnpm --filter @scrum-poker/protocol build && node scripts/run-local-bin.mjs tsc -p load/tsconfig.json && node .task-9-load-build/load/sse-load.js"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.2",
     "@playwright/test": "^1.55.0",
     "@types/node": "^22.18.0",
-    "cross-env": "^10.0.0",
     "eslint": "^9.35.0",
     "prettier": "^3.6.2",
-    "start-server-and-test": "^2.1.0",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
   }

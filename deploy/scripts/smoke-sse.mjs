@@ -6,10 +6,11 @@ import https from "node:https";
 const PRODUCTION_DURATION_SECONDS = 300;
 const PRODUCTION_MIN_HEARTBEATS = 9;
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
+const LOOPBACK_HOSTNAMES = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 
 function usage() {
   console.error(
-    "Usage: node deploy/scripts/smoke-sse.mjs --base-url=<https-url> [--allow-http] " +
+    "Usage: node deploy/scripts/smoke-sse.mjs --base-url=<https-url> [--allow-http] [--app-id=scrum-poker] " +
       "[--duration-seconds=<seconds>] [--min-heartbeats=<count>]",
   );
 }
@@ -29,6 +30,7 @@ function parsePositiveInteger(value, name, { allowZero = false } = {}) {
 
 function parseOptions(argv) {
   let baseUrl;
+  let appId;
   let allowHttp = false;
   let durationSeconds = process.env.SMOKE_DURATION_SECONDS ?? String(PRODUCTION_DURATION_SECONDS);
   let minHeartbeats = process.env.SMOKE_MIN_HEARTBEATS ?? String(PRODUCTION_MIN_HEARTBEATS);
@@ -56,6 +58,8 @@ function parseOptions(argv) {
 
     if (name === "--base-url") {
       baseUrl = value;
+    } else if (name === "--app-id") {
+      appId = value;
     } else if (name === "--duration-seconds") {
       durationSeconds = value;
     } else if (name === "--min-heartbeats") {
@@ -84,6 +88,14 @@ function parseOptions(argv) {
     throw new Error("base URL must not contain a query string or fragment");
   }
 
+  if (appId !== undefined && appId !== "scrum-poker") {
+    throw new Error("--app-id must be scrum-poker");
+  }
+
+  if (appId !== undefined && !LOOPBACK_HOSTNAMES.has(parsedBaseUrl.hostname)) {
+    throw new Error("--app-id is restricted to direct loopback checks");
+  }
+
   parsedBaseUrl.pathname = parsedBaseUrl.pathname.replace(/\/+$/, "");
 
   const duration = parsePositiveInteger(durationSeconds, "duration-seconds");
@@ -96,6 +108,7 @@ function parseOptions(argv) {
 
   return {
     baseUrl: parsedBaseUrl,
+    appId,
     allowHttp,
     durationSeconds: duration,
     minHeartbeats: heartbeats,
@@ -107,14 +120,22 @@ function requestUrl(baseUrl, pathname) {
   return new URL(pathname.replace(/^\//, ""), `${baseUrl.toString().replace(/\/$/, "")}/`);
 }
 
-function requestJson(baseUrl, pathname, { method, token, body } = {}) {
-  const url = requestUrl(baseUrl, pathname);
+function headersFor(options, initial) {
+  const headers = { ...initial };
+  if (options.appId !== undefined) {
+    headers["X-Backend-App"] = options.appId;
+  }
+  return headers;
+}
+
+function requestJson(options, pathname, { method, token, body } = {}) {
+  const url = requestUrl(options.baseUrl, pathname);
   const transport = url.protocol === "https:" ? https : http;
   const bodyText = body === undefined ? undefined : JSON.stringify(body);
-  const headers = {
+  const headers = headersFor(options, {
     Accept: "application/json",
     "User-Agent": "scrum-poker-sse-smoke/1",
-  };
+  });
 
   if (token !== undefined) {
     headers.Authorization = `Bearer ${token}`;
@@ -166,8 +187,8 @@ function requestJson(baseUrl, pathname, { method, token, body } = {}) {
   });
 }
 
-function openSse(baseUrl, roomId, ticket, heartbeatIntervalSeconds) {
-  const url = requestUrl(baseUrl, `/api/rooms/${encodeURIComponent(roomId)}/stream`);
+function openSse(options, roomId, ticket) {
+  const url = requestUrl(options.baseUrl, `/api/rooms/${encodeURIComponent(roomId)}/stream`);
   url.searchParams.set("ticket", ticket);
   const transport = url.protocol === "https:" ? https : http;
   let response;
@@ -272,12 +293,12 @@ function openSse(baseUrl, roomId, ticket, heartbeatIntervalSeconds) {
       url,
       {
         method: "GET",
-        headers: {
+        headers: headersFor(options, {
           Accept: "text/event-stream",
           "Cache-Control": "no-cache",
           "User-Agent": "scrum-poker-sse-smoke/1",
-        },
-        timeout: Math.max(DEFAULT_REQUEST_TIMEOUT_MS, heartbeatIntervalSeconds * 3_000),
+        }),
+        timeout: Math.max(DEFAULT_REQUEST_TIMEOUT_MS, options.heartbeatIntervalSeconds * 3_000),
       },
       (candidateResponse) => {
         response = candidateResponse;
@@ -334,7 +355,7 @@ function delay(milliseconds) {
 
 async function runSmoke(options) {
   const displayName = `smoke-${Date.now().toString(36)}-${randomBytes(5).toString("hex")}`.slice(0, 30);
-  const created = await requestJson(options.baseUrl, "/api/rooms", {
+  const created = await requestJson(options, "/api/rooms", {
     method: "POST",
     body: { displayName },
   });
@@ -345,7 +366,7 @@ async function runSmoke(options) {
     throw new Error("room creation response was invalid");
   }
 
-  const ticketResponse = await requestJson(options.baseUrl, `/api/rooms/${encodeURIComponent(roomId)}/stream-ticket`, {
+  const ticketResponse = await requestJson(options, `/api/rooms/${encodeURIComponent(roomId)}/stream-ticket`, {
     method: "POST",
     token: participantToken,
   });
@@ -354,12 +375,12 @@ async function runSmoke(options) {
     throw new Error("stream ticket response was invalid");
   }
 
-  const stream = openSse(options.baseUrl, roomId, ticket, options.heartbeatIntervalSeconds);
+  const stream = openSse(options, roomId, ticket);
   try {
     await stream.connected;
     const initialRevision = await stream.initial;
 
-    await requestJson(options.baseUrl, `/api/rooms/${encodeURIComponent(roomId)}/votes`, {
+    await requestJson(options, `/api/rooms/${encodeURIComponent(roomId)}/votes`, {
       method: "POST",
       token: participantToken,
       body: { value: "5" },
