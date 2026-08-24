@@ -5,15 +5,15 @@ types, browser E2E clients, load client, and frontend deployment checks.
 
 ## Backend ownership
 
-The Scrum Poker API is implemented and deployed by `keothom/be` as the
-`scrum-poker` service in `all-in-one-backend`. Backend code, PM2, Nginx,
-the maintenance flag, shared-VM operations, cutover, and rollback are owned by
-the KeoThom repository. The public API origin remains
+The Scrum Poker API is implemented and deployed by the standalone
+`all-in-one-backend` repository as the `scrum-poker` service. Backend code,
+PM2, Nginx, the maintenance flag, shared-VM operations, cutover, and rollback
+are owned by the standalone backend repository. The public API origin remains
 `https://poker-api.keothom24.com`.
 
-Follow `keothom/docs/all-in-one-backend-operations.md` for backend
-configuration and operations. Do not run backend deployment or service
-commands from this repository.
+Follow `all-in-one-backend/docs/operations.md` for backend configuration and
+operations. Do not run backend deployment or service commands from this
+repository.
 
 ## GitHub Pages and API origin
 
@@ -82,7 +82,7 @@ SMOKE_DURATION_SECONDS=5 SMOKE_MIN_HEARTBEATS=1 SMOKE_HEARTBEAT_INTERVAL_SECONDS
 ```
 
 `--app-id=scrum-poker` is accepted only for loopback checks. Public requests
-omit it because the KeoThom-owned reverse proxy injects and overwrites the
+omit it because the standalone backend reverse proxy injects and overwrites the
 trusted routing header.
 
 Never place bearer tokens, stream tickets, authenticated stream URLs, or

@@ -66,6 +66,16 @@ describe("repo entry points", () => {
     expect(scripts["test:load"]).toMatch(/not-implemented|load/i);
   });
 
+  it("points backend operations at the standalone repository", async () => {
+    const operations = await readFile("docs/operations.md", "utf8");
+    const loadReadme = await readFile("load/README.md", "utf8");
+
+    expect(operations).toContain("all-in-one-backend/docs/operations.md");
+    expect(loadReadme).toContain("all-in-one-backend/docs/operations.md");
+    expect(operations).not.toContain("keothom/be");
+    expect(loadReadme).not.toContain("keothom/be");
+  });
+
   it("exposes a usable workspace configuration for protocol", async () => {
     const workspace = await readFile("vitest.workspace.ts", "utf8");
 

@@ -6,12 +6,13 @@ starts a backend, never defaults to a URL, rejects malformed values, and
 refuses production-looking hosts such as
 `https://poker-api.keothom24.com`.
 
-The backend and its test harness are owned by `keothom/be`. Start an approved
-local `all-in-one-backend` harness separately and route the supplied URL to
-the `scrum-poker` service before running this client. Direct shared-host
-requests require the trusted `X-Backend-App: scrum-poker` metadata, so use
-the KeoThom-owned local proxy or test harness rather than pointing this client
-at an unrouted shared-host port.
+The backend and its test harness are owned by the standalone
+`all-in-one-backend` repository. Start an approved local harness
+separately and route the supplied URL to the `scrum-poker` service before
+running this client. Direct shared-host requests require the trusted
+`X-Backend-App: scrum-poker` metadata, so use the standalone backend local
+proxy or test harness rather than pointing this client at an unrouted
+shared-host port.
 
 The load shape is fixed at 5 rooms by 20 participants: 100 concurrent SSE
 clients. The runner:
@@ -40,7 +41,7 @@ corepack pnpm test:load -- --base-url=http://127.0.0.1:4100 --duration-seconds=3
 
 Running load against production requires explicit approval and is not part of
 repository verification. Coordinate the 300-second observation with the
-KeoThom backend owner and follow
-`keothom/docs/all-in-one-backend-operations.md` for process RSS, restart
-counters, available memory, and rollback criteria. This repository does not
-own PM2, Nginx, VM state, or backend lifecycle operations.
+standalone backend owner and follow `all-in-one-backend/docs/operations.md`
+for process RSS, restart counters, available memory, and rollback criteria.
+This repository does not own PM2, Nginx, VM state, or backend lifecycle
+operations.
