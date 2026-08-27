@@ -83,4 +83,17 @@ describe("repo entry points", () => {
     expect(workspace).toContain("packages/protocol");
     expect(workspace).not.toContain("export default []");
   });
+
+  it("publishes the canonical repository from master", async () => {
+    const workflow = await readFile(".github/workflows/pages.yml", "utf8");
+    const operations = await readFile("docs/operations.md", "utf8");
+
+    expect(workflow).toMatch(/branches:\s*\n\s*- master/);
+    expect(workflow).not.toMatch(/branches:\s*\n\s*- main/);
+    expect(workflow).toContain("VITE_BASE_PATH: /scrum-poker/");
+    expect(workflow).toContain("VITE_API_BASE_URL: https://poker-api.keothom24.com");
+    expect(workflow).toContain("path: apps/web/dist");
+    expect(operations).toContain("https://pltbinh.github.io/scrum-poker/");
+    expect(operations).toContain("default branch is `master`");
+  });
 });

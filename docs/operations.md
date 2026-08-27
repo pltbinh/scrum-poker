@@ -21,12 +21,14 @@ repository.
 2. Build with `VITE_BASE_PATH=/scrum-poker/`.
 3. Build with
    `VITE_API_BASE_URL=https://poker-api.keothom24.com`.
-4. Use hash routes such as
-   `https://<github-owner>.github.io/scrum-poker/#/room/<room-id>` so direct
-   room links do not require a Pages rewrite.
-5. Keep the backend CORS origin set to
-   `https://<github-owner>.github.io`; `/scrum-poker/` is not part of the
-   browser origin.
+4. GitHub Actions publishes pushes to the repository; the default branch is `master`.
+5. Use the canonical site URL
+   `https://pltbinh.github.io/scrum-poker/` and hash routes such as
+   `https://pltbinh.github.io/scrum-poker/#/room/<room-id>` so direct room
+   links do not require a Pages rewrite.
+6. Keep the backend CORS origin set to
+   `https://pltbinh.github.io`; `/scrum-poker/` is not part of the browser
+   origin.
 
 Static assets remain on GitHub Pages. Browser traffic to the API uses ordinary
 HTTP requests and native EventSource/SSE. WebSocket and Socket.IO traffic are
