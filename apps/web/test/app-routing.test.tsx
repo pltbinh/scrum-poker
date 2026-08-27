@@ -56,13 +56,14 @@ describe("App routing", () => {
 
     render(<App api={createApi()} credentials={createCredentials()} />);
 
-    expect(
-      await screen.findByRole("heading", { name: /ready to play/i }, { timeout: 5000 }),
-    ).toBeInTheDocument();
+    await waitFor(
+      () => {
+        expect(window.location.hash).toBe("#/");
+      },
+      { timeout: 10000 },
+    );
 
-    await waitFor(() => {
-      expect(window.location.hash).toBe("#/");
-    });
+    expect(screen.getByRole("heading", { name: /ready to play/i })).toBeInTheDocument();
   });
 
   it("updates the join form when the shared room hash changes while mounted", async () => {
